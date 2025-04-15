@@ -66,15 +66,6 @@
       return res.ok;
     }
 
-    async function updateKey(key) {
-      const res = await fetch(`${API_BASE}/api/keys`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(key)
-      });
-      return res.ok;
-    }
-
     async function deleteKey(provider, model) {
       const res = await fetch(`${API_BASE}/api/keys`, {
         method: "DELETE",
@@ -123,12 +114,7 @@
       if (!provider || !model || !apiKey) return;
       // Try to update if exists, else add
       const keys = await fetchKeys();
-      const existing = keys.find(k => k.provider === provider && k.model === model);
-      if (existing) {
-        await updateKey({ provider, model, api_key: apiKey });
-      } else {
-        await addKey({ provider, model, api_key: apiKey });
-      }
+      await addKey({ provider, model, api_key: apiKey });
       renderKeys();
       this.reset();
     };
