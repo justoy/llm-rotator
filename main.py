@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file if present
 load_dotenv()
+import pathlib
 
 app = FastAPI()
 
@@ -52,6 +53,25 @@ def load_key_list():
 
 KEY_LIST = load_key_list()
 
+def save_keys_to_env_file():
+    """
+    Save the current KEY_LIST to the .env file as the LLM_KEYS variable.
+    """
+    env_path = pathlib.Path(".env")
+    # Read existing .env content if present
+    env_lines = []
+    if env_path.exists():
+        with env_path.open("r") as f:
+            env_lines = f.readlines()
+    # Remove any existing LLM_KEYS line
+    env_lines = [line for line in env_lines if not line.strip().startswith("LLM_KEYS=")]
+    # Add the new LLM_KEYS line
+    llm_keys_json = json.dumps(KEY_LIST, separators=(",", ":"))
+    env_lines.append(f'LLM_KEYS={llm_keys_json}\n')
+    # Write back to .env
+    with env_path.open("w") as f:
+        f.writelines(env_lines)
+
 # Round-robin counters by model
 round_robin_counters = {}
 
@@ -74,6 +94,18 @@ def get_next_key_for_model(requested_model: str):
 async def get_keys():
     with KEY_LIST_LOCK:
         return JSONResponse(content=KEY_LIST)
+
+@app.post("/api/keys/save")
+async def save_keys():
+    """
+    Save the current in-memory key list to the .env file (persist to disk).
+    """
+    with KEY_LIST_LOCK:
+        try:
+            save_keys_to_env_file()
+            return JSONResponse(content={"success": True})
+        except Exception as e:
+            return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.post("/api/keys")
 async def add_key(request: Request):

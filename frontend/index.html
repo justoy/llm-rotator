@@ -21,6 +21,8 @@
 </head>
 <body>
   <h1>API Key Manager</h1>
+  <button id="saveKeysBtn" style="background:#27ae60;color:#fff;border:none;padding:0.5em 1.2em;border-radius:3px;cursor:pointer;">Save All Keys to Disk</button>
+  <span id="saveStatus" style="margin-left:1em;font-size:0.95em;"></span>
   <div class="key-list" id="keyList"></div>
 
   <form class="add-form" id="addKeyForm">
@@ -117,6 +119,28 @@
       await addKey({ provider, model, api_key: apiKey });
       renderKeys();
       this.reset();
+    };
+
+    // Save all keys to disk
+    document.getElementById("saveKeysBtn").onclick = async function() {
+      const status = document.getElementById("saveStatus");
+      status.textContent = "Saving...";
+      status.style.color = "#888";
+      try {
+        const res = await fetch(`${API_BASE}/api/keys/save`, { method: "POST" });
+        if (res.ok) {
+          status.textContent = "Keys saved to disk.";
+          status.style.color = "#27ae60";
+        } else {
+          const err = await res.json();
+          status.textContent = "Save failed: " + (err.error || "Unknown error");
+          status.style.color = "#e74c3c";
+        }
+      } catch (e) {
+        status.textContent = "Save failed: " + e.message;
+        status.style.color = "#e74c3c";
+      }
+      setTimeout(() => { status.textContent = ""; }, 3000);
     };
 
     // Initial render
