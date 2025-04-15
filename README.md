@@ -1,11 +1,14 @@
-# LLM Proxy with API Key Rotation (Round-Robin) and Web UI
+# LLM Proxy with API Key Rotation and Web UI
 
-A FastAPI-based proxy server that forwards chat requests to OpenAI, Anthropic, Gemini, Deepseek, Grok, or other LLM providers. It automatically rotates API keys using a round-robin strategy. API keys are managed via environment variable (with .env file support) and can be viewed/edited in-memory via the web UI.
+A FastAPI-based proxy server that forwards chat requests to OpenAI, Anthropic, Gemini, Deepseek, Grok, or other LLM providers. It automatically rotates API keys. API keys are managed via environment variable (with .env file support) and can be viewed/edited in-memory via the web UI.
+
+This is useful when you have multiple LLM API keys with free tier. You don't need to manually change API key or model anymore.
 
 ## Features
 
 - **Multiple Providers:** Supports OpenAI, Anthropic, Gemini, Deepseek, and Grok out of the box.
-- **Round-Robin Rotation:** Automatically rotates API keys for each model using a round-robin strategy.
+- **API Key Rotation:** Automatically rotates API keys.
+- **Cross-Model Call:** You can specify multiple models in one request, e.g., `"model": "gpt-4o,claude-3-7-sonnet-latest"`,  and the proxy will auto select a model and its API key.
 - **Web UI for API Key Management:** Add, update, and delete API keys using a browser-based interface (changes are in-memory only).
 - **Environment-Based Configuration:** API keys are supplied via the `LLM_KEYS` environment variable, which can be set in a `.env` file.
 - **Lightweight Proxy:** Built with FastAPI for high performance and easy integration.
@@ -18,64 +21,13 @@ A FastAPI-based proxy server that forwards chat requests to OpenAI, Anthropic, G
 
 ## Setup
 
-### 1. API Key Management
-
-#### Environment Variable or .env File (Required)
-
-Define the API keys and their metadata in a JSON array and store it in the `LLM_KEYS` environment variable. You can set this variable directly in your shell, or by creating a `.env` file in your project directory. The server will automatically load environment variables from `.env` using [python-dotenv](https://pypi.org/project/python-dotenv/).
-
-##### Example `.env` file
-
-```
-LLM_KEYS=[
-  { "api_key": "OPENAI_KEY_1", "model": "gpt-4o", "provider": "openai" },
-  { "api_key": "GEMINI_KEY", "model": "gemini-2.0-flash", "provider": "google" },
-  { "api_key": "DEEPSEEK_KEY", "model": "deepseek-chat", "provider": "deepseek" },
-  { "api_key": "ANTHROPIC_1",  "model": "claude-3-7-sonnet-latest", "provider": "anthropic" }
-]
-```
-
-##### Example for Linux/macOS
-
-```bash
-export LLM_KEYS='[
-  { "api_key": "OPENAI_KEY_1", "model": "gpt-4o", "provider": "openai" },
-  { "api_key": "GEMINI_KEY", "model": "gemini-pro", "provider": "google" }
-]'
-```
-
-##### Example for Windows (CMD)
-
-```cmd
-set LLM_KEYS=[{"api_key": "OPENAI_KEY_1", "model": "gpt-4o", "provider": "openai"}]
-```
-
-**Note:** The value of `LLM_KEYS` must be a valid JSON array of objects, each with `provider`, `model`, and `api_key` fields.
-
-#### Web UI (In-Memory Only)
-
-- You can use the Web UI to add, update, or delete API keys for any supported provider and model.
-- **Changes made via the Web UI or API are only stored in memory and will be lost when the server restarts.**
-- To persist changes, update the `LLM_KEYS` environment variable or your `.env` file and restart the server.
-
-### 2. Install Dependencies
-
-Create a `requirements.txt` file with the following (or adjust versions as needed):
-
-```
-fastapi==0.95.0
-uvicorn==0.22.0
-httpx==0.24.0
-python-dotenv==1.0.1
-```
-
-Install them using:
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Running the Proxy
+### 2. Running the Proxy
 
 Start the FastAPI server using Uvicorn:
 
@@ -83,34 +35,41 @@ Start the FastAPI server using Uvicorn:
 uvicorn main:app --host 0.0.0.0 --port 7788
 ```
 
-### 4. Using the Web UI
+### 3. Using the Web UI to manage LLM Model API Keys
 
-Open `frontend/index.html` in your browser. You can now:
+Open `http://0.0.0.0:7788` in your browser. You can now:
 - View all API keys currently configured on the backend
 - Add new API keys for any supported provider/model
 - Update or delete existing API keys
-
-**All changes made via the Web UI are in-memory only. To persist changes, update your environment variable or .env file.**
+- Save API keys to `.env` file
 
 ## Making Requests
+Before making requests, please ensure you already added corresponding API keys and models.
 
-Once the server is running, you can forward chat completions requests to your proxy endpoint. For example, using `curl`:
+Once the server is running, your client (e.g., Cursor, Cline, and SillyTarven) can forward chat completions requests to your proxy endpoint. For example, using `curl` to query gpt-4o or claude-3-7-sonnet-latest:
 
 ```bash
-curl http://localhost:7788/chat/completions \
+curl localhost:7788/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer DUMMY_API_KEY" \
   -d '{
-    "model": "gpt-4o",
+    "model": "gpt-4o,claude-3-7-sonnet-latest",
     "messages": [
-      { "role": "system", "content": "You are a helpful assistant." },
-      { "role": "user", "content": "Hello!" }
+      {
+        "role": "developer",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "Hello!"
+      }
     ]
   }'
 ```
 
 The proxy will:
 - Parse the incoming JSON.
-- Look up the API key corresponding to the model using a round-robin mechanism.
+- Pick up a model and Look up the API key corresponding to the model.
 - Forward the request to the appropriate LLM provider (OpenAI, Anthropic, Gemini, Deepseek, or Grok).
 - Return the response from the provider.
 
@@ -133,8 +92,3 @@ These endpoints are used by the frontend UI, but can also be called directly.
 - **Grok** (`provider: "grok"`)
 
 You can extend support for additional providers by adding new client classes in `provider_client.py`.
-
-## Notes
-
-- The `LLM_KEYS` environment variable (or .env file) is the only source of truth for API keys. There is no persistent file storage.
-- For production, secure your API endpoints and restrict CORS as needed.

@@ -3,7 +3,10 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from provider_client import PROVIDER_CLIENTS
-from key_manager import KeyManager
+from key_manager import KeyManager, LLMKey
+from api_key_selector import ApiKeySelector
+from dataclasses import asdict
+from typing import List
 
 app = FastAPI()
 
@@ -23,10 +26,13 @@ app.add_middleware(
 # Key management via KeyManager class
 # ---------------------------------------
 key_manager = KeyManager()
+api_key_selector = ApiKeySelector()
 
 @app.get("/api/keys")
 async def get_keys():
-    return JSONResponse(content=key_manager.get_keys())
+    # Convert LLMKey objects to dicts for JSON serialization
+    keys: List[LLMKey] = key_manager.get_keys()
+    return JSONResponse(content=[asdict(k) for k in keys])
 
 @app.post("/api/keys/save")
 async def save_keys():
@@ -49,7 +55,12 @@ async def add_key(request: Request):
     required_fields = {"provider", "model", "api_key"}
     if not required_fields.issubset(data):
         return JSONResponse(content={"error": "Missing required fields"}, status_code=400)
-    key_manager.add_key(data["provider"], data["model"], data["api_key"])
+    # Ensure correct types and pass to add_key
+    key_manager.add_key(
+        provider=str(data["provider"]),
+        model=str(data["model"]),
+        api_key=str(data["api_key"])
+    )
     return JSONResponse(content={"success": True})
 
 @app.delete("/api/keys")
@@ -74,19 +85,22 @@ async def chat_completions(request: Request):
     if not requested_model:
         return {"error": "Missing 'model' in request"}
 
-    selected = key_manager.get_next_key_for_model(requested_model)
-    if not selected:
-        return {"error": f"No available key for model '{requested_model}'"}
+    # Support multiple models separated by comma in the string
+    model_candidates = [m.strip() for m in requested_model.split(",") if m.strip()]
+    selected_model: LLMKey = api_key_selector.get_next_key_for_model(key_manager.get_keys(), model_candidates)
 
-    provider = selected["provider"]
-    api_key = selected["api_key"]
-    messages = body.get("messages", [])
+    if not selected_model:
+        return {"error": f"No available key for any of the requested models: {model_candidates}"}
 
-    client = PROVIDER_CLIENTS.get(provider)
+    client = PROVIDER_CLIENTS.get(selected_model.provider)
     if not client:
-        return {"error": f"Provider '{provider}' not implemented"}
+        return {"error": f"Provider '{selected_model.provider}' not implemented"}
 
-    return await client.send_chat_completion(api_key, requested_model, messages)
+    # Use the selected model for forwarding
+    # Pass the model name string to the client
+    # Pass original request headers to preserve them except for replacing dummy key
+
+    return await client.send_chat_completion(selected_model.api_key, selected_model.model, body, dict(request.headers))
 
 # Redirect root URL to /frontend/index.html
 @app.get("/")

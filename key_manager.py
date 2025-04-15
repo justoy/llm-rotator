@@ -2,14 +2,21 @@ import os
 import json
 import pathlib
 from dotenv import load_dotenv
+from dataclasses import dataclass, asdict
+from typing import List, Optional, Any
+
+@dataclass
+class LLMKey:
+    provider: str
+    model: str
+    api_key: str
 
 class KeyManager:
     def __init__(self):
         load_dotenv()
-        self.key_list = self._load_key_list()
-        self.round_robin_counters = {}
+        self.key_list: List[LLMKey] = self._load_key_list()
 
-    def _load_key_list(self):
+    def _load_key_list(self) -> List[LLMKey]:
         """
         Load key list from the LLM_KEYS environment variable.
         LLM_KEYS should be a JSON array of objects, e.g.:
@@ -25,27 +32,23 @@ class KeyManager:
             except Exception as e:
                 raise RuntimeError(f"Failed to parse LLM_KEYS: {e}")
             assert isinstance(key_list, list) and all(isinstance(k, dict) for k in key_list)
-            return key_list
+            return [LLMKey(**k) for k in key_list]
         return []
 
-    def get_keys(self):
+    def get_keys(self) -> List[LLMKey]:
         return list(self.key_list)
 
-    def add_key(self, provider, model, api_key):
-        self.key_list.append({
-            "provider": provider,
-            "model": model,
-            "api_key": api_key
-        })
+    def add_key(self, provider: str, model: str, api_key: str) -> None:
+        self.key_list.append(LLMKey(provider=provider, model=model, api_key=api_key))
 
-    def delete_key(self, provider, model):
-        idx = next((i for i, k in enumerate(self.key_list) if k["provider"] == provider and k["model"] == model), None)
+    def delete_key(self, provider: str, model: str) -> bool:
+        idx = next((i for i, k in enumerate(self.key_list) if k.provider == provider and k.model == model), None)
         if idx is not None:
             self.key_list.pop(idx)
             return True
         return False
 
-    def save_keys_to_env_file(self):
+    def save_keys_to_env_file(self) -> None:
         """
         Save the current key_list to the .env file as the LLM_KEYS variable.
         """
@@ -58,21 +61,8 @@ class KeyManager:
         # Remove any existing LLM_KEYS line
         env_lines = [line for line in env_lines if not line.strip().startswith("LLM_KEYS=")]
         # Add the new LLM_KEYS line
-        llm_keys_json = json.dumps(self.key_list, separators=(",", ":"))
+        llm_keys_json = json.dumps([asdict(k) for k in self.key_list], separators=(",", ":"))
         env_lines.append(f'LLM_KEYS={llm_keys_json}\n')
         # Write back to .env
         with env_path.open("w") as f:
             f.writelines(env_lines)
-
-    def get_next_key_for_model(self, requested_model):
-        matches = [k for k in self.key_list if k["model"] == requested_model]
-        if not matches:
-            return None
-
-        if requested_model not in self.round_robin_counters:
-            self.round_robin_counters[requested_model] = 0
-
-        idx = self.round_robin_counters[requested_model]
-        selected = matches[idx % len(matches)]
-        self.round_robin_counters[requested_model] += 1
-        return selected
