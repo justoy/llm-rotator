@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>API Key Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; background: #f9f9f9; }
+    h1 { color: #333; }
+    .key-list { margin-top: 1em; }
+    .key-item { background: #fff; border: 1px solid #ddd; padding: 1em; margin-bottom: 0.5em; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .key-info { font-size: 0.95em; }
+    .delete-btn { background: #e74c3c; color: #fff; border: none; padding: 0.3em 0.7em; border-radius: 3px; cursor: pointer; }
+    .delete-btn:hover { background: #c0392b; }
+    .add-form { margin-top: 2em; background: #fff; padding: 1em; border-radius: 4px; border: 1px solid #ddd; }
+    label { display: block; margin-top: 0.5em; }
+    input, select { width: 100%; padding: 0.5em; margin-top: 0.2em; }
+    button[type="submit"] { margin-top: 1em; background: #3498db; color: #fff; border: none; padding: 0.5em 1.2em; border-radius: 3px; cursor: pointer; }
+    button[type="submit"]:hover { background: #217dbb; }
+  </style>
+</head>
+<body>
+  <h1>API Key Manager</h1>
+  <div class="key-list" id="keyList"></div>
+
+  <form class="add-form" id="addKeyForm">
+    <h2>Add API Key</h2>
+    <label>
+      Provider
+      <select id="provider" required>
+        <option value="">Select provider</option>
+        <option value="openai">OpenAI</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="gemini">Gemini</option>
+        <option value="deepseek">Deepseek</option>
+        <option value="grok">Grok</option>
+      </select>
+    </label>
+    <label>
+      Model
+      <input type="text" id="model" required placeholder="e.g. gpt-4, claude-3, gemini-pro" />
+    </label>
+    <label>
+      API Key
+      <input type="password" id="apiKey" required />
+    </label>
+    <button type="submit">Add Key</button>
+  </form>
+
+  <script>
+    // Backend API base URL (adjust if needed)
+    const API_BASE = "";
+
+    async function fetchKeys() {
+      const res = await fetch(`${API_BASE}/api/keys`);
+      if (!res.ok) return [];
+      return await res.json();
+    }
+
+    async function addKey(key) {
+      const res = await fetch(`${API_BASE}/api/keys`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(key)
+      });
+      return res.ok;
+    }
+
+    async function updateKey(key) {
+      const res = await fetch(`${API_BASE}/api/keys`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(key)
+      });
+      return res.ok;
+    }
+
+    async function deleteKey(provider, model) {
+      const res = await fetch(`${API_BASE}/api/keys`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, model })
+      });
+      return res.ok;
+    }
+
+    async function renderKeys() {
+      const keyList = document.getElementById("keyList");
+      const keys = await fetchKeys();
+      keyList.innerHTML = "";
+      if (keys.length === 0) {
+        keyList.innerHTML = "<em>No API keys stored.</em>";
+        return;
+      }
+      keys.forEach((key, idx) => {
+        const div = document.createElement("div");
+        div.className = "key-item";
+        div.innerHTML = `
+          <div class="key-info">
+            <strong>Provider:</strong> ${key.provider} <br>
+            <strong>Model:</strong> ${key.model} <br>
+            <strong>API Key:</strong> <span style="letter-spacing:2px;">••••••••</span>
+          </div>
+          <button class="delete-btn" data-provider="${key.provider}" data-model="${key.model}">Delete</button>
+        `;
+        keyList.appendChild(div);
+      });
+      document.querySelectorAll(".delete-btn").forEach(btn => {
+        btn.onclick = async function() {
+          const provider = this.getAttribute("data-provider");
+          const model = this.getAttribute("data-model");
+          await deleteKey(provider, model);
+          renderKeys();
+        };
+      });
+    }
+
+    document.getElementById("addKeyForm").onsubmit = async function(e) {
+      e.preventDefault();
+      const provider = document.getElementById("provider").value;
+      const model = document.getElementById("model").value.trim();
+      const apiKey = document.getElementById("apiKey").value.trim();
+      if (!provider || !model || !apiKey) return;
+      // Try to update if exists, else add
+      const keys = await fetchKeys();
+      const existing = keys.find(k => k.provider === provider && k.model === model);
+      if (existing) {
+        await updateKey({ provider, model, api_key: apiKey });
+      } else {
+        await addKey({ provider, model, api_key: apiKey });
+      }
+      renderKeys();
+      this.reset();
+    };
+
+    // Initial render
+    renderKeys();
+  </script>
+</body>
+</html>
