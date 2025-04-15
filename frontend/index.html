@@ -39,8 +39,9 @@
       </select>
     </label>
     <label>
-      Model
-      <input type="text" id="model" required placeholder="e.g. gpt-4, claude-3, gemini-pro" />
+      Model(s)
+      <input type="text" id="model" required placeholder="e.g. gpt-4, claude-3, gemini-pro (comma or newline separated)" />
+      <small>Enter one or more models, separated by commas or new lines.</small>
     </label>
     <label>
       API Key
@@ -111,12 +112,19 @@
     document.getElementById("addKeyForm").onsubmit = async function(e) {
       e.preventDefault();
       const provider = document.getElementById("provider").value;
-      const model = document.getElementById("model").value.trim();
+      const modelInput = document.getElementById("model").value.trim();
       const apiKey = document.getElementById("apiKey").value.trim();
-      if (!provider || !model || !apiKey) return;
-      // Try to update if exists, else add
-      const keys = await fetchKeys();
-      await addKey({ provider, model, api_key: apiKey });
+      if (!provider || !modelInput || !apiKey) return;
+
+      // Support multiple models: split by comma or newline, trim, and filter out empty
+      const models = modelInput
+        .split(/[\n,]+/)
+        .map(m => m.trim())
+        .filter(m => m.length > 0);
+
+      for (const model of models) {
+        await addKey({ provider, model, api_key: apiKey });
+      }
       renderKeys();
       this.reset();
     };

@@ -78,7 +78,7 @@ class GrokClient(ProviderClient):
 PROVIDER_CLIENTS = {
     "openai": OpenAIClient(),
     "anthropic": AnthropicClient(),
-    "gemini": GeminiClient(),
+    "google": GeminiClient(),
     "deepseek": DeepseekClient(),
     "grok": GrokClient(),
 }

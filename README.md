@@ -29,10 +29,9 @@ Define the API keys and their metadata in a JSON array and store it in the `LLM_
 ```
 LLM_KEYS=[
   { "api_key": "OPENAI_KEY_1", "model": "gpt-4o", "provider": "openai" },
-  { "api_key": "GEMINI_KEY", "model": "gemini-pro", "provider": "gemini" },
+  { "api_key": "GEMINI_KEY", "model": "gemini-2.0-flash", "provider": "google" },
   { "api_key": "DEEPSEEK_KEY", "model": "deepseek-chat", "provider": "deepseek" },
-  { "api_key": "GROK_KEY", "model": "grok-1", "provider": "grok" },
-  { "api_key": "ANTHROPIC_1",  "model": "claude-3-7-sonnet", "provider": "anthropic" }
+  { "api_key": "ANTHROPIC_1",  "model": "claude-3-7-sonnet-latest", "provider": "anthropic" }
 ]
 ```
 
@@ -41,7 +40,7 @@ LLM_KEYS=[
 ```bash
 export LLM_KEYS='[
   { "api_key": "OPENAI_KEY_1", "model": "gpt-4o", "provider": "openai" },
-  { "api_key": "GEMINI_KEY", "model": "gemini-pro", "provider": "gemini" }
+  { "api_key": "GEMINI_KEY", "model": "gemini-pro", "provider": "google" }
 ]'
 ```
 
