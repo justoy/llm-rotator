@@ -31,11 +31,6 @@
       Provider
       <select id="provider" required>
         <option value="">Select provider</option>
-        <option value="openai">OpenAI</option>
-        <option value="anthropic">Anthropic</option>
-        <option value="gemini">Gemini</option>
-        <option value="deepseek">Deepseek</option>
-        <option value="grok">Grok</option>
       </select>
     </label>
     <label>
@@ -153,6 +148,25 @@
 
     // Initial render
     renderKeys();
+    
+    async function populateProviders() {
+      try {
+        const res = await fetch(`${API_BASE}/api/providers`);
+        if (!res.ok) return;
+        const providers = await res.json();
+        const providerSelect = document.getElementById("provider");
+        providerSelect.innerHTML = '<option value="">Select provider</option>';
+        providers.forEach(p => {
+          const option = document.createElement("option");
+          option.value = p;
+          option.textContent = p;
+          providerSelect.appendChild(option);
+        });
+      } catch(e) {
+        console.error("Failed to fetch providers", e);
+      }
+    }
+    populateProviders();
   </script>
 </body>
 </html>

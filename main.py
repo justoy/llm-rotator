@@ -2,11 +2,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from provider_client import PROVIDER_CLIENTS
 from key_manager import KeyManager, LLMKey
 from api_key_selector import ApiKeySelector
 from dataclasses import asdict
 from typing import List
+from provider_client import LlmClient
+from litellm.types.utils import LlmProvidersSet
+
 
 app = FastAPI()
 
@@ -27,6 +29,7 @@ app.add_middleware(
 # ---------------------------------------
 key_manager = KeyManager()
 api_key_selector = ApiKeySelector()
+llm_client = LlmClient()
 
 @app.get("/api/keys")
 async def get_keys():
@@ -55,6 +58,11 @@ async def add_key(request: Request):
     required_fields = {"provider", "model", "api_key"}
     if not required_fields.issubset(data):
         return JSONResponse(content={"error": "Missing required fields"}, status_code=400)
+    
+    provider = data["provider"]
+    if data["provider"] not in LlmProvidersSet:
+        return JSONResponse(content={"error": f"provider {provider} must be in the list {LlmProvidersSet}"}, status_code=400)
+   
     # Ensure correct types and pass to add_key
     key_manager.add_key(
         provider=str(data["provider"]),
@@ -92,17 +100,14 @@ async def chat_completions(request: Request):
     if not selected_model:
         return {"error": f"No available key for any of the requested models: {model_candidates}"}
 
-    client = PROVIDER_CLIENTS.get(selected_model.provider)
-    if not client:
-        return {"error": f"Provider '{selected_model.provider}' not implemented"}
-
     # Use the selected model for forwarding
-    # Pass the model name string to the client
-    # Pass original request headers to preserve them except for replacing dummy key
-
-    return await client.send_chat_completion(selected_model.api_key, selected_model.model, body, dict(request.headers))
+    return await llm_client.send_chat_completion(selected_model, body)
 
 # Redirect root URL to /frontend/index.html
+@app.get("/api/providers")
+async def get_providers():
+    return JSONResponse(content=list(LlmProvidersSet))
+
 @app.get("/")
 async def root():
     return RedirectResponse(url="/frontend/index.html")
